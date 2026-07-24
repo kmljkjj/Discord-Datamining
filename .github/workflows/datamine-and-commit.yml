@@ -1,0 +1,53 @@
+name: Discord Datamining (generate + commit)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+concurrency:
+  group: discord-datamining-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  datamine:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      # Remplace cette commande par celle du repo si nécessaire.
+      - name: Run datamining
+        run: bun start
+
+      - name: Commit and push (safe)
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Mets tout en commit (ou limite à un dossier si tu sais lequel)
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Datamining update"
+
+          # Évite les erreurs du type "Expected branch to point to ..."
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
