@@ -1,4 +1,4 @@
-name: Discord datamining
+name: Discord Datamining (generate + commit)
 
 on:
   schedule:
@@ -12,7 +12,6 @@ concurrency:
 jobs:
   datamine:
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
 
@@ -22,7 +21,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Installe Bun (si le repo l'utilise)
+      - name: Free disk space (fix no space left)
+        run: |
+          set -e
+          echo "Disk before:"
+          df -h
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /home/runner/.cache || true
+          sudo rm -rf /tmp/* || true
+
+          echo "Disk after:"
+          df -h
+
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -31,20 +43,18 @@ jobs:
       - name: Install deps
         run: bun install
 
-      # ---- À REMPLACER ----
-      # Mets ici la commande exacte que le repo utilise pour dataminer.
       - name: Run datamining
         run: bun start
-      # ----------------------
 
       - name: Commit and push (safe)
+        env:
+          BRANCH: ${{ github.ref_name }}
         run: |
           set -e
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Cache le risque de “no changes”
           git add -A
 
           if git diff --cached --quiet; then
@@ -54,6 +64,5 @@ jobs:
 
           git commit -m "Datamining update"
 
-          # Évite l'erreur de branche quand un autre run pousse entre-temps
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git pull --rebase origin "$BRANCH"
+          git push origin "HEAD:$BRANCH"
